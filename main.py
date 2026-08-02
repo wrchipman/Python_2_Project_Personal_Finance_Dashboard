@@ -1,6 +1,10 @@
-def main():
-    print("Welcome to the Personal Financial Dashboard")
+"""Entry point for the Personal Finance Dashboard application."""
 
 
-if __name__ == '__main__':
-    main()  
+def main() -> None:
+    """Run the Personal Finance Dashboard application."""
+    print("Personal Finance Dashboard — starting up...")
+
+
+if __name__ == "__main__":
+    main()
