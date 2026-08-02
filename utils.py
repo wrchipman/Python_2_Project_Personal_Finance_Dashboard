@@ -347,7 +347,8 @@ def rate_limit(max_per_session: int) -> Callable:
     return decorator
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run all utils.py demonstration calls (audited __main__ guard)."""
     print(format_currency(1250.5))
     log_event("deposit", "Checking", amount=250.00)
 
@@ -365,3 +366,7 @@ if __name__ == "__main__":
             + format_date_col(t["date"])
         )
         print(row)
+
+
+if __name__ == "__main__":
+    main()

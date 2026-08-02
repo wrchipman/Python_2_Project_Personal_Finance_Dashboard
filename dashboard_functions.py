@@ -91,7 +91,8 @@ def export_report(report_name: str) -> str:
     return f"Exported report: {report_name}"
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run all dashboard_functions.py demonstration calls (audited __main__ guard)."""
     print(add_transaction(150.00, "Groceries"))
     print(load_transactions("data/transactions.csv"))
     print(save_transactions([{"amount": 150.00}], "data/transactions.csv"))
@@ -113,3 +114,7 @@ if __name__ == "__main__":
             print(export_report(f"report_{i}"))
         except RuntimeError as e:
             print(f"Call {i} failed: {e}")
+
+
+if __name__ == "__main__":
+    main()

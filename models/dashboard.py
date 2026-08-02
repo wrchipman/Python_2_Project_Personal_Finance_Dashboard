@@ -1,0 +1,1 @@
+# no __main__ guard needed — no top-level executable code

@@ -107,7 +107,8 @@ def make_formatter(symbol: str, decimal_places: int) -> Callable[[float], str]:
     return formatter
 
 
-if __name__ == "__main__":
+def main() -> None:
+    """Run all transaction_utils.py demonstration calls (audited __main__ guard)."""
     sample_transactions = [
         {"category": "Salary", "amount": 3000.00, "type": "Income", "description": "  monthly salary  ", "date": "2026-01-01"},
         {"category": "Groceries", "amount": 85.40, "type": "Expense", "description": "weekly groceries", "date": "2026-01-03"},
@@ -136,3 +137,7 @@ if __name__ == "__main__":
     format_jpy = make_formatter("¥", 0)
     print(format_usd(1250.5))
     print(format_jpy(1250.5))
+
+
+if __name__ == "__main__":
+    main()
