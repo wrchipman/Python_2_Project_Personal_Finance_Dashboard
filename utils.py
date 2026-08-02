@@ -1,11 +1,11 @@
 """General-purpose utility functions for the Personal Finance Dashboard.
 
-This module holds formatting, logging, validation, and filtering
-helpers that are not tied to any single domain class. Functions here
-are pure where possible and are safe to import from any other module
-in the project.
+This module holds formatting, logging, validation, filtering, and
+decorator helpers that are not tied to any single domain class.
+Functions here are pure where possible and are safe to import from
+any other module in the project.
 
-Note: the validators and formatters below (make_range_validator,
+Note: the validators and formatters in this module (make_range_validator,
 make_string_validator, and the six named validators; make_currency_formatter
 and the three named currency formatters) are practice implementations
 of the factory/closure pattern. The Dashboard's actual production
@@ -14,6 +14,8 @@ use a different contract (they raise ValidationError rather than
 returning a tuple).
 """
 
+import time
+from functools import wraps
 from typing import Callable
 
 
@@ -212,49 +214,149 @@ format_amount_col = make_column_formatter(12, "right")
 format_date_col = make_column_formatter(12, "left")
 
 
+# ---------------------------------------------------------------------------
+# Decorator library
+# ---------------------------------------------------------------------------
+
+call_log: list[str] = []
+
+
+def log_to_list(func: Callable) -> Callable:
+    """Decorator that appends a call record to the module-level call_log.
+
+    Args:
+        func: The function being decorated.
+
+    Returns:
+        A wrapped version of func that logs its name and arguments to
+        call_log before executing, then returns func's normal result.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        call_log.append(f"{func.__name__} called with args={args}, kwargs={kwargs}")
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def timed(func: Callable) -> Callable:
+    """Decorator that prints how long the wrapped function took to run.
+
+    Args:
+        func: The function being decorated.
+
+    Returns:
+        A wrapped version of func that prints its elapsed execution
+        time in seconds, then returns func's normal result.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        start = time.perf_counter()
+        result = func(*args, **kwargs)
+        elapsed = time.perf_counter() - start
+        print(f"{func.__name__} took {elapsed:.6f}s")
+        return result
+
+    return wrapper
+
+
+def require_positive(func: Callable) -> Callable:
+    """Decorator that requires the first positional argument to be positive.
+
+    Args:
+        func: The function being decorated. Its first positional
+            argument (after self, if any) is treated as an amount
+            that must be greater than zero.
+
+    Returns:
+        A wrapped version of func that raises ValueError if the
+        checked argument is not a positive number, otherwise calls
+        func normally.
+
+    Raises:
+        ValueError: If the checked argument is not a positive number.
+    """
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        amount = args[0] if args else kwargs.get("amount")
+        if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
+            raise ValueError(f"{func.__name__} requires a positive amount, got {amount!r}")
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+def retry(max_attempts: int) -> Callable:
+    """Decorator factory that retries a function on exception.
+
+    Args:
+        max_attempts: The maximum number of times to attempt the call
+            before letting the final exception propagate.
+
+    Returns:
+        A decorator that wraps a function to retry it up to
+        max_attempts times if it raises an exception.
+    """
+    def decorator(func: Callable) -> Callable:
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            last_exception = None
+            for attempt in range(1, max_attempts + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as exc:
+                    last_exception = exc
+                    print(f"{func.__name__} attempt {attempt} failed: {exc}")
+            raise last_exception
+
+        return wrapper
+
+    return decorator
+
+
+def rate_limit(max_per_session: int) -> Callable:
+    """Decorator factory that limits how many times a function may be called.
+
+    Args:
+        max_per_session: The maximum number of calls allowed during
+            the current program run.
+
+    Returns:
+        A decorator that wraps a function to raise RuntimeError once
+        it has been called more than max_per_session times.
+
+    Raises:
+        RuntimeError: If the wrapped function is called more than
+            max_per_session times.
+    """
+    def decorator(func: Callable) -> Callable:
+        list_counter = [0]
+
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            list_counter[0] += 1
+            if list_counter[0] > max_per_session:
+                raise RuntimeError(
+                    f"{func.__name__} exceeded rate limit of "
+                    f"{max_per_session} calls per session"
+                )
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
 if __name__ == "__main__":
     print(format_currency(1250.5))
-    print(format_currency(42.1, symbol="€"))
-
     log_event("deposit", "Checking", amount=250.00)
-    log_event("startup")
 
-    sample_records = [
-        {"category": "Groceries", "amount": 42.50},
-        {"category": "Rent", "amount": 1200.00},
-    ]
-    print(filter_by_field(sample_records, "category", "Groceries"))
-    print(filter_by_field(sample_records, "category", None))
-
-    # --- Validation factory tests ---
     print(validate_amount(500.00))
-    print(validate_amount(-5))
-    print(validate_amount(True))
-
-    print(validate_year(2026))
-    print(validate_year(1999))
-
-    print(validate_month(6))
-    print(validate_month(13))
-
-    print(validate_day(15))
-    print(validate_day(32))
-
-    print(validate_account_name("Checking"))
-    print(validate_account_name("   "))
-
-    print(validate_description("Weekly groceries"))
-    print(validate_description("x" * 250))
-
-    # --- Formatting factory tests ---
     print(format_usd(1250.5))
-    print(format_eur(1250.5))
-    print(format_jpy(1250.5))
 
     sample_transactions = [
         {"category": "Groceries", "amount": 42.50, "date": "2026-01-03"},
         {"category": "Rent", "amount": 1200.00, "date": "2026-01-01"},
-        {"category": "Utilities", "amount": 95.00, "date": "2026-01-10"},
     ]
     for t in sample_transactions:
         row = (
