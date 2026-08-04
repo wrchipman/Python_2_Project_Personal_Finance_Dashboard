@@ -1,7 +1,11 @@
 """Dashboard controller class for the Personal Finance Dashboard.
 
-run() now logs session start and end in addition to its existing
-exception-handling behavior around load/save and each menu action.
+Adds reporting helper methods using comprehensions/generator
+expressions per the tool-selection decision cascade, plus
+iter_monthly_summaries(), a generator function producing one summary
+dict per calendar month. Income/expense classification is derived
+from Category lookups rather than amount sign, since Transaction
+amounts have been positive-only by validated design since Lesson 10.
 """
 
 from datetime import datetime
@@ -202,7 +206,13 @@ class Dashboard:
         print(f"Added: {transaction}")
 
     def _display_summary(self) -> None:
-        """Print a summary of all accounts and recent transactions."""
+        """Print a summary of all accounts and recent transactions.
+
+        Uses explicit for loops rather than comprehensions: these are
+        side effects (printing), and the decision cascade calls for
+        an explicit loop whenever the result is a side effect rather
+        than a reused value.
+        """
         print(self)
         print("--- Accounts ---")
         for account in self._accounts:
@@ -210,6 +220,118 @@ class Dashboard:
         print("--- Transactions ---")
         for transaction in self._transactions:
             print(f"  {transaction}")
+
+    def get_total_balance(self) -> float:
+        """Return the sum of all account balances.
+
+        Uses a generator expression inside sum() since the result
+        feeds a single aggregator and is not reused elsewhere.
+
+        Returns:
+            The sum of every account's balance as a float.
+        """
+        return sum(account.balance for account in self._accounts)
+
+    def get_account_names(self) -> list:
+        """Return a list of every account's name.
+
+        Uses a list comprehension since the result is reused for
+        display purposes (e.g., populating a menu of account names).
+
+        Returns:
+            A list of account name strings.
+        """
+        return [account.name for account in self._accounts]
+
+    def get_unique_categories(self) -> set:
+        """Return the set of distinct transaction category names.
+
+        Uses a set comprehension since duplicate category names must
+        collapse to a single entry.
+
+        Returns:
+            A set of unique category name strings.
+        """
+        return {t.category for t in self._transactions}
+
+    def _is_income_category(self, category_name: str) -> bool:
+        """Determine whether a category name represents income.
+
+        Normalizes category_name the same way Category.__post_init__
+        does, then looks it up against self._categories. If no
+        matching Category is found, defaults to treating it as an
+        expense — the safer assumption for a budgeting tool, since
+        undercounting income is less harmful than overcounting it.
+
+        Args:
+            category_name: The category name to classify.
+
+        Returns:
+            True if a matching Category with type "income" is found,
+            False otherwise (including when no match is found).
+        """
+        normalized = category_name.strip().title()
+        for cat in self._categories:
+            if cat.name == normalized:
+                return cat.is_income()
+        return False
+
+    def iter_monthly_summaries(self):
+        """Yield one summary dictionary per calendar month present in transactions.
+
+        Uses a set comprehension to derive the unique (year, month)
+        pairs, and a generator expression inside sum() for the
+        income/expense aggregation within each month.
+
+        Yields:
+            dict: Keys are "year", "month", "month_label" (formatted
+            "YYYY-MM"), "income", "expenses", "net", and
+            "transaction_count". Yielded in chronological order.
+        """
+        year_months = {
+            (
+                datetime.strptime(t.date, Transaction.DATE_FORMAT).year,
+                datetime.strptime(t.date, Transaction.DATE_FORMAT).month,
+            )
+            for t in self._transactions
+        }
+
+        for year, month in sorted(year_months):
+            month_transactions = [
+                t
+                for t in self._transactions
+                if datetime.strptime(t.date, Transaction.DATE_FORMAT).year == year
+                and datetime.strptime(t.date, Transaction.DATE_FORMAT).month == month
+            ]
+
+            income = sum(
+                t.amount for t in month_transactions if self._is_income_category(t.category)
+            )
+            expenses = sum(
+                t.amount for t in month_transactions if not self._is_income_category(t.category)
+            )
+
+            yield {
+                "year": year,
+                "month": month,
+                "month_label": f"{year:04d}-{month:02d}",
+                "income": income,
+                "expenses": expenses,
+                "net": income - expenses,
+                "transaction_count": len(month_transactions),
+            }
+
+    def display_monthly_report(self) -> None:
+        """Print a formatted table of monthly summaries via iter_monthly_summaries()."""
+        print("--- Monthly Report ---")
+        for summary in self.iter_monthly_summaries():
+            print(
+                f"{summary['month_label']} | "
+                f"Income: {Account.format_balance(summary['income']):>12} | "
+                f"Expenses: {Account.format_balance(summary['expenses']):>12} | "
+                f"Net: {Account.format_balance(summary['net']):>12} | "
+                f"Transactions: {summary['transaction_count']}"
+            )
 
     def run(self) -> None:
         """Run the interactive CLI menu loop.
@@ -233,7 +355,8 @@ class Dashboard:
             print("3. Withdraw")
             print("4. Add Transaction")
             print("5. View Summary")
-            print("6. Exit")
+            print("6. Monthly Report")
+            print("7. Exit")
             choice = input("Choose an option: ").strip()
 
             try:
@@ -248,6 +371,8 @@ class Dashboard:
                 elif choice == "5":
                     self._display_summary()
                 elif choice == "6":
+                    self.display_monthly_report()
+                elif choice == "7":
                     break
                 else:
                     print("Invalid option, please try again.")
