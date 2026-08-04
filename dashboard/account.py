@@ -1,8 +1,8 @@
 """Account domain class for the Personal Finance Dashboard.
 
-Now includes the full instance/class/static method pattern. Gains
-full encapsulation with properties in Lesson 11, and becomes the
-base for CreditAccount/SavingsAccount subclasses in Lesson 12.
+Now fully encapsulated with protected attributes and validated
+properties. Becomes the base for CreditAccount/SavingsAccount
+subclasses in Lesson 12, then BaseAccount(ABC) in Lesson 13.
 """
 
 
@@ -29,6 +29,22 @@ class Account:
             balance: The starting balance. Defaults to 0.0.
 
         Raises:
+            ValueError: If account_type is not in VALID_TYPES, or if
+                balance is negative.
+        """
+        self._validate_type(account_type)
+        self._name = name
+        self._account_type = account_type
+        self.balance = balance  # goes through the setter for validation
+        Account.account_count += 1
+
+    def _validate_type(self, account_type: str) -> None:
+        """Raise ValueError if account_type is not a valid type.
+
+        Args:
+            account_type: The string to validate.
+
+        Raises:
             ValueError: If account_type is not in VALID_TYPES.
         """
         if not Account.is_valid_type(account_type):
@@ -36,10 +52,37 @@ class Account:
                 f"account_type must be one of {sorted(Account.VALID_TYPES)}, "
                 f"got {account_type!r}"
             )
-        self.name = name
-        self.account_type = account_type
-        self.balance = balance
-        Account.account_count += 1
+
+    @property
+    def name(self) -> str:
+        """str: The account's display name (read-only)."""
+        return self._name
+
+    @property
+    def account_type(self) -> str:
+        """str: The account's type (read-only)."""
+        return self._account_type
+
+    @property
+    def balance(self) -> float:
+        """float: The account's current balance."""
+        return self._balance
+
+    @balance.setter
+    def balance(self, value: float) -> None:
+        """Set the account's balance with validation.
+
+        Args:
+            value: The new balance. Must be a non-negative number.
+
+        Raises:
+            ValueError: If value is not a non-negative number.
+        """
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"balance must be a number, got {type(value).__name__}")
+        if value < 0:
+            raise ValueError(f"balance cannot be negative, got {value}")
+        self._balance = float(value)
 
     def deposit(self, amount: float) -> bool:
         """Add funds to the account balance.
@@ -53,7 +96,7 @@ class Account:
         """
         if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
             return False
-        self.balance += amount
+        self.balance = self.balance + amount
         return True
 
     def withdraw(self, amount: float) -> bool:
@@ -71,7 +114,7 @@ class Account:
             return False
         if amount > self.balance:
             return False
-        self.balance -= amount
+        self.balance = self.balance - amount
         return True
 
     def get_balance(self) -> float:
