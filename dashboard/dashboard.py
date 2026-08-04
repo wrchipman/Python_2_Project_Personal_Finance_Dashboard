@@ -1,9 +1,12 @@
 """Dashboard controller class for the Personal Finance Dashboard.
 
-_prompt_add_account() and _prompt_add_transaction() now validate
-input at the CLI boundary using dashboard/validators.py, and a new
-_prompt_add_category() closes the previous gap where Category had no
-CLI entry point despite being used since Lesson 17.
+get_net_worth() was added via the red-green-refactor TDD cycle in
+Lesson 20. Its first green implementation duplicated
+get_total_balance()'s generator-expression-and-sum() logic; the
+refactor step consolidated it to delegate instead, since for this
+Dashboard's account model the two calculations are identical (a
+credit account's negative balance already represents a liability, so
+summing all balances IS the net worth).
 """
 
 from datetime import date, datetime
@@ -277,6 +280,25 @@ class Dashboard:
             The sum of every account's balance as a float.
         """
         return sum(account.balance for account in self._accounts)
+
+    def get_net_worth(self) -> float:
+        """Return the dashboard's total net worth.
+
+        Delegates to get_total_balance(). For this Dashboard's
+        account model, a credit account's negative balance already
+        represents a liability, so summing all account balances
+        (assets and liabilities alike) IS the net worth calculation —
+        there is no separate math to perform. This method exists
+        under its own domain-facing name for callers that want to
+        express "net worth" rather than "total balance," and was
+        built independently via the Lesson 20 TDD cycle before this
+        equivalence was noticed and the duplicate logic was
+        refactored away.
+
+        Returns:
+            The sum of every account's balance as a float.
+        """
+        return self.get_total_balance()
 
     def get_account_names(self) -> list:
         """Return a list of every account's name.
