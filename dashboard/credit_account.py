@@ -1,8 +1,11 @@
 """CreditAccount domain class for the Personal Finance Dashboard.
 
 A CreditAccount is an Account whose balance may go negative up to a
-configured credit limit, and whose withdraw() rule is therefore a
-full override rather than an extension of the base Account rule.
+configured credit limit. This requires overriding the balance
+property itself (not just withdraw()) — Account's inherited balance
+setter forbids any negative value, which is correct for checking and
+savings accounts but wrong for credit accounts, where a negative
+balance is the normal representation of amount owed.
 """
 
 from dashboard.account import Account
@@ -11,7 +14,8 @@ from dashboard.account import Account
 class CreditAccount(Account):
     """An Account that permits a negative balance up to a credit limit.
 
-    Attributes inherited from Account: name, account_type, balance.
+    Attributes inherited from Account: name, account_type, balance
+    (with a permissive lower bound overridden below).
     """
 
     def __init__(self, name: str, balance: float = 0.0, credit_limit: float = 1000.0) -> None:
@@ -20,7 +24,8 @@ class CreditAccount(Account):
         Args:
             name: The display name for this account.
             balance: The starting balance. Defaults to 0.0. May be
-                negative if reconstructing from stored data.
+                negative (down to -credit_limit) if reconstructing
+                from stored data.
             credit_limit: The maximum amount the balance may go
                 negative by. Must be a positive number. Defaults to
                 1000.0.
@@ -42,6 +47,38 @@ class CreditAccount(Account):
     def available_credit(self) -> float:
         """float: How much more can be charged before hitting the credit limit."""
         return self.credit_limit + self.balance
+
+    @property
+    def balance(self) -> float:
+        """float: The account's current balance.
+
+        Overrides Account.balance to permit a negative value down to
+        -credit_limit, since a credit account's balance represents
+        amount owed and is expected to go negative under normal use.
+        Both the getter and setter must be redefined together — you
+        cannot override just one half of an inherited property.
+        """
+        return self._balance
+
+    @balance.setter
+    def balance(self, value: float) -> None:
+        """Set the balance, permitting negative values down to -credit_limit.
+
+        Args:
+            value: The new balance. Must be a number no less than
+                -credit_limit.
+
+        Raises:
+            ValueError: If value is not a number, or is less than
+                -credit_limit.
+        """
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"balance must be a number, got {type(value).__name__}")
+        if value < -self._credit_limit:
+            raise ValueError(
+                f"balance cannot go below -{self._credit_limit} (credit_limit), got {value}"
+            )
+        self._balance = float(value)
 
     def withdraw(self, amount: float) -> bool:
         """Charge the credit account, allowed to go negative up to credit_limit.
