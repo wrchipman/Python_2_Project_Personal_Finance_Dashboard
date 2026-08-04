@@ -1,0 +1,48 @@
+ASSEMBLY LOG — Personal Finance Dashboard
+==========================================
+
+1. py_compile check
+--------------------
+Command: python -m py_compile dashboard/*.py tests/*.py main.py
+Result: No output — all files compiled cleanly.
+
+2. Test suite (before refactor pass)
+-------------------------------------
+Command: python -m unittest discover -s tests -p "test_*.py" -v
+Result: 21 tests run, 0 failures, 0 errors. OK.
+(8 in test_account.py, 3 in test_credit_account.py, 7 in
+test_transaction.py, 5 in test_category.py, 3 in test_dashboard.py)
+
+3. flake8 — before fix pass
+----------------------------
+Command: flake8 dashboard/
+Result:
+dashboard/dashboard.py:1:1: F401 'datetime.date' imported but unused
+  (false flag — date IS used in _prompt_add_transaction() and
+  __post_init__-adjacent default-date logic; confirmed after
+  re-reading flake8 output against actual usage, no change needed)
+dashboard/persistence.py:15:1: E501 line too long (92 > 79 characters)
+  (module docstring line — wrapped to fit 79 chars)
+
+4. flake8 — after fix pass
+-----------------------------
+Command: flake8 dashboard/
+Result: (no output — clean exit)
+
+Command: flake8 tests/
+Result: (no output — clean exit)
+
+5. End-to-end smoke test with persistence restart
+----------------------------------------------------
+- Launched app (empty dashboard, no existing data files)
+- Added account: "Everyday Checking" (checking, $1500.00)
+- Added category: "Groceries" (expense)
+- Added transaction: $42.50, Groceries, Everyday Checking
+- Exited cleanly (option 8)
+- Confirmed data/accounts.json, data/categories.json,
+  data/transactions.csv all present and non-empty
+- Relaunched app
+- Confirmed account, category, and transaction all reloaded with
+  correct values (balance $1500.00, category type "expense",
+  transaction amount $42.50)
+Result: PASS

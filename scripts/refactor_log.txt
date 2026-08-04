@@ -1,0 +1,52 @@
+REFACTOR LOG — Personal Finance Dashboard
+============================================
+
+Category 1: Duplicated validation
+-----------------------------------
+Reviewed: Account._validate_type() (internal, raises ValueError) vs.
+validate_account_type() in dashboard/validators.py (boundary-level,
+raises ValidationError). These check the same VALID_TYPES membership
+but serve different purposes — one is a defensive backstop against
+direct misuse of the Account constructor, the other is the CLI/file
+boundary check. This is intentional layered validation, not
+accidental duplication (documented in Lesson 19). No change made.
+
+Category 2: print() calls inside domain classes
+---------------------------------------------------
+Reviewed: Account, CreditAccount, SavingsAccount, Transaction,
+Category, BaseAccount. No print() calls found in any domain class.
+All output happens in Dashboard's _prompt_*/_display_* methods and
+the run() CLI loop, where it belongs. No change needed.
+
+Category 3: Overgrown functions
+-----------------------------------
+Reviewed: Dashboard.run() is the longest method in the codebase at
+~30 lines, but it is a straightforward menu dispatch loop with one
+line per option — splitting it further would not meaningfully
+improve readability. Transaction._validate_date() and
+Account._validate_type() are both under 10 lines. No functions
+flagged as overgrown. No change needed.
+
+Category 4: Unused imports
+-------------------------------
+Checked every file in dashboard/ against its actual usages:
+  - dashboard/account.py: all imports used
+  - dashboard/credit_account.py: all imports used
+  - dashboard/savings_account.py: no exception imports needed, none present
+  - dashboard/transaction.py: all imports used (ValidationError,
+    FileLoadError both used in from_dict())
+  - dashboard/category.py: all imports used
+  - dashboard/base_account.py: all imports used
+  - dashboard/persistence.py: all imports used
+  - dashboard/dashboard.py: all imports used
+  - dashboard/validators.py: all imports used
+  - dashboard/logging_config.py: all imports used
+  - dashboard/__init__.py: all imports re-exported via __all__
+No unused imports found. No change needed.
+
+Post-refactor test suite
+-----------------------------
+Command: python -m unittest discover -s tests -p "test_*.py" -v
+Result: 21 tests run, 0 failures, 0 errors. OK.
+(No test changes were needed since no functional code changed during
+this pass — only the docstring line-length fix in persistence.py.)
