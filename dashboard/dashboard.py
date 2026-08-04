@@ -1,16 +1,18 @@
 """Dashboard controller class for the Personal Finance Dashboard.
 
-load()/save() now read/write real CSV and JSON files via the rewritten
-dashboard/persistence.py, replacing the pipe-delimited text scaffold
-from Lessons 15-16.
+_prompt_add_account() and _prompt_add_transaction() now validate
+input at the CLI boundary using dashboard/validators.py, and a new
+_prompt_add_category() closes the previous gap where Category had no
+CLI entry point despite being used since Lesson 17.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from dashboard.transaction import Transaction
 from dashboard.account import Account
 from dashboard.credit_account import CreditAccount
 from dashboard.savings_account import SavingsAccount
+from dashboard.category import Category
 from dashboard.exceptions import DashboardError, FileLoadError, FileSaveError, AccountError
 from dashboard.persistence import (
     load_accounts,
@@ -19,6 +21,12 @@ from dashboard.persistence import (
     save_categories,
     load_transactions,
     save_transactions,
+)
+from dashboard.validators import (
+    validate_amount,
+    validate_date,
+    validate_account_type,
+    validate_category_name,
 )
 from dashboard.logging_config import get_logger
 
@@ -57,7 +65,7 @@ class Dashboard:
         """
         self._transactions.append(transaction)
 
-    def add_category(self, category) -> None:
+    def add_category(self, category: Category) -> None:
         """Add a category to the dashboard's in-memory collection.
 
         Args:
@@ -106,6 +114,11 @@ class Dashboard:
     def _get_valid_amount(self, prompt: str) -> float:
         """Prompt the user until they enter a valid positive amount.
 
+        Used by _prompt_deposit()/_prompt_withdraw(), which don't
+        touch file-loaded data — the simple retry-loop pattern from
+        Lesson 15 is still the right fit there. Transaction entry
+        uses validate_amount() instead (see _prompt_add_transaction).
+
         Args:
             prompt: The text to display when asking for input.
 
@@ -128,6 +141,10 @@ class Dashboard:
     def _get_valid_date(self, prompt: str) -> datetime:
         """Prompt the user until they enter a valid YYYY-MM-DD date.
 
+        Retained for potential future use with retry-style prompts.
+        Not currently called — _prompt_add_transaction() uses
+        validate_date() with single-shot validation instead.
+
         Args:
             prompt: The text to display when asking for input.
 
@@ -145,9 +162,17 @@ class Dashboard:
                 return parsed
 
     def _prompt_add_account(self) -> None:
-        """Interactively prompt for and create a new account."""
+        """Interactively prompt for and create a new account.
+
+        account_type is validated at the boundary with
+        validate_account_type() before any Account subclass is
+        constructed, so bad input surfaces as ValidationError here
+        rather than reaching Account._validate_type()'s internal
+        ValueError.
+        """
         name = input("Account name: ").strip()
-        account_type = input("Account type (checking/savings/credit): ").strip().lower()
+        raw_type = input("Account type (checking/savings/credit): ")
+        account_type = validate_account_type(raw_type)
         has_balance = input("Start with a balance? (y/n): ").strip().lower() == "y"
         balance = self._get_valid_amount("Starting balance: ") if has_balance else 0.0
 
@@ -160,6 +185,21 @@ class Dashboard:
 
         self.add_account(account)
         print(f"Added: {account}")
+
+    def _prompt_add_category(self) -> None:
+        """Interactively prompt for and create a new category.
+
+        name is validated at the boundary with validate_category_name().
+        category_type is validated by Category.__post_init__ itself,
+        which raises ValidationError (as of Lesson 19).
+        """
+        raw_name = input("Category name: ")
+        name = validate_category_name(raw_name)
+        category_type = input("Category type (income/expense): ").strip().lower()
+
+        category = Category(name, category_type)
+        self.add_category(category)
+        print(f"Added: {category.name} ({category.category_type})")
 
     def _prompt_deposit(self) -> None:
         """Interactively prompt for and perform a deposit."""
@@ -180,21 +220,30 @@ class Dashboard:
     def _prompt_add_transaction(self) -> None:
         """Interactively prompt for and record a new transaction.
 
-        Note: this method is hardened further in Lesson 19, which
-        replaces the retry-loop helpers used here with the dedicated
-        validate_amount()/validate_date() functions from
-        dashboard/validators.py.
+        Uses the boundary validator pattern: one input() per field,
+        one validator call per field, no retry loop. Any
+        ValidationError/AccountError raised here propagates up to
+        run()'s single except DashboardError block. An empty date
+        input defaults to today's date without calling validate_date().
         """
         account_name = input("Account name: ").strip()
         self._find_account(account_name)  # raises AccountError if not found
-        amount = self._get_valid_amount("Transaction amount: ")
-        date_obj = self._get_valid_date("Date (YYYY-MM-DD): ")
+
+        raw_amount = input("Transaction amount: ")
+        amount = validate_amount(raw_amount)
+
+        raw_date = input("Date (YYYY-MM-DD, press Enter for today): ")
+        if raw_date.strip() == "":
+            transaction_date = date.today()
+        else:
+            transaction_date = validate_date(raw_date)
+
         category = input("Category: ").strip()
         description = input("Description (optional): ").strip()
 
         transaction = Transaction(
             amount=amount,
-            date=date_obj.strftime(Transaction.DATE_FORMAT),
+            date=transaction_date.strftime(Transaction.DATE_FORMAT),
             category=category,
             account_name=account_name,
             description=description,
@@ -351,9 +400,10 @@ class Dashboard:
             print("2. Deposit")
             print("3. Withdraw")
             print("4. Add Transaction")
-            print("5. View Summary")
-            print("6. Monthly Report")
-            print("7. Exit")
+            print("5. Add Category")
+            print("6. View Summary")
+            print("7. Monthly Report")
+            print("8. Exit")
             choice = input("Choose an option: ").strip()
 
             try:
@@ -366,10 +416,12 @@ class Dashboard:
                 elif choice == "4":
                     self._prompt_add_transaction()
                 elif choice == "5":
-                    self._display_summary()
+                    self._prompt_add_category()
                 elif choice == "6":
-                    self.display_monthly_report()
+                    self._display_summary()
                 elif choice == "7":
+                    self.display_monthly_report()
+                elif choice == "8":
                     break
                 else:
                     print("Invalid option, please try again.")

@@ -1,12 +1,17 @@
 """Transaction domain class for the Personal Finance Dashboard.
 
-Transaction now has a complete dunder interface supporting equality,
-hashing, and date-based ordering via functools.total_ordering, in
-addition to its read-only properties and serialization contract.
+from_dict() now pre-validates amount/date with the boundary
+validators from dashboard/validators.py and re-raises failures as
+FileLoadError, since from_dict() is the path used when reconstructing
+Transactions from a (potentially corrupted) loaded file. Direct
+construction via Transaction(...) is unaffected — it still goes
+through _validate_amount/_validate_date, which still raise ValueError.
 """
 
 from datetime import datetime
 from functools import total_ordering
+
+from dashboard.exceptions import ValidationError, FileLoadError
 
 
 @total_ordering
@@ -113,7 +118,9 @@ class Transaction:
 
         Returns:
             A dictionary with keys "amount", "date", "category",
-            "account_name", "description".
+            "account_name", "description". date is already stored as
+            a "%Y-%m-%d" string, so no additional formatting is
+            needed here.
         """
         return {
             "amount": self.amount,
@@ -125,7 +132,15 @@ class Transaction:
 
     @classmethod
     def from_dict(cls, data: dict) -> "Transaction":
-        """Construct a Transaction from a dictionary.
+        """Construct a Transaction from a dictionary, validating at the boundary.
+
+        This is the reconstruction path used when loading from a
+        (potentially corrupted or tampered) file. amount and date are
+        pre-validated with the boundary validators from
+        dashboard/validators.py; a validation failure here means the
+        stored data itself is bad, so it is surfaced as FileLoadError
+        rather than the plain ValueError direct construction would
+        raise.
 
         Args:
             data: A dictionary with keys "amount", "date", "category",
@@ -133,10 +148,25 @@ class Transaction:
 
         Returns:
             A new Transaction instance built from the dictionary.
+
+        Raises:
+            FileLoadError: If amount or date fail boundary validation.
         """
+        # Imported here (not at module level) to avoid a circular
+        # import: validators.py imports from dashboard.account, and
+        # transaction.py is imported before account.py finishes
+        # loading in some import orders.
+        from dashboard.validators import validate_amount, validate_date
+
+        try:
+            clean_amount = validate_amount(str(data["amount"]))
+            clean_date = validate_date(data["date"])
+        except ValidationError as exc:
+            raise FileLoadError(f"Transaction record failed validation: {exc}") from exc
+
         return cls(
-            amount=float(data["amount"]),
-            date=data["date"],
+            amount=clean_amount,
+            date=clean_date.strftime(Transaction.DATE_FORMAT),
             category=data["category"],
             account_name=data["account_name"],
             description=data.get("description", ""),
