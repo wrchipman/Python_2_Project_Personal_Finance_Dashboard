@@ -1,13 +1,14 @@
 """Account domain class for the Personal Finance Dashboard.
 
-deposit() and withdraw() now raise ValidationError/AccountError on
-failure instead of returning False, matching the exception hierarchy
-finalized in Lesson 7. This supersedes the return-bool behavior from
-Lessons 9-12.
+deposit() and withdraw() now log their outcomes in addition to
+raising ValidationError/AccountError on failure.
 """
 
 from dashboard.base_account import BaseAccount
 from dashboard.exceptions import ValidationError, AccountError
+from dashboard.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 
 class Account(BaseAccount):
@@ -101,8 +102,10 @@ class Account(BaseAccount):
             ValidationError: If amount is not a positive number.
         """
         if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
+            logger.warning(f"Deposit rejected for {self.name}: invalid amount {amount!r}")
             raise ValidationError(f"deposit amount must be a positive number, got {amount!r}")
         self.balance = self.balance + amount
+        logger.info(f"Deposited {amount} to {self.name}; new balance {self.balance}")
         return True
 
     def withdraw(self, amount: float) -> bool:
@@ -120,12 +123,18 @@ class Account(BaseAccount):
             AccountError: If amount exceeds the current balance.
         """
         if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
+            logger.warning(f"Withdrawal rejected for {self.name}: invalid amount {amount!r}")
             raise ValidationError(f"withdraw amount must be a positive number, got {amount!r}")
         if amount > self.balance:
+            logger.warning(
+                f"Withdrawal rejected for {self.name}: insufficient funds "
+                f"(balance {self.balance}, requested {amount})"
+            )
             raise AccountError(
                 f"insufficient funds: balance is {self.balance}, cannot withdraw {amount}"
             )
         self.balance = self.balance - amount
+        logger.info(f"Withdrew {amount} from {self.name}; new balance {self.balance}")
         return True
 
     def get_balance(self) -> float:

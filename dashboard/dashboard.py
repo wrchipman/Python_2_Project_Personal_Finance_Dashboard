@@ -1,10 +1,7 @@
 """Dashboard controller class for the Personal Finance Dashboard.
 
-Dashboard now has a real (if temporary) persistence layer via
-dashboard/persistence.py, plus the interactive CLI entry point,
-run(), with full exception handling around load/save and each menu
-action. The pipe-delimited persistence.py backing this is replaced
-wholesale in Lesson 18 with real CSV/JSON handling.
+run() now logs session start and end in addition to its existing
+exception-handling behavior around load/save and each menu action.
 """
 
 from datetime import datetime
@@ -22,6 +19,9 @@ from dashboard.persistence import (
     load_transactions,
     save_transactions,
 )
+from dashboard.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 ACCOUNTS_FILE = "data/accounts.txt"
 CATEGORIES_FILE = "data/categories.txt"
@@ -217,8 +217,9 @@ class Dashboard:
         Loads existing data on startup (warning, not crashing, on
         failure), loops through menu actions catching DashboardError
         around each one, and saves on exit (warning, not crashing,
-        on failure).
+        on failure). Logs session start and end.
         """
+        logger.info("Dashboard session starting")
         try:
             self.load()
         except FileLoadError as e:
@@ -257,6 +258,7 @@ class Dashboard:
             self.save()
         except FileSaveError as e:
             print(f"Warning: could not save data ({e}). Changes may be lost.")
+        logger.info("Dashboard session ending")
 
     def __repr__(self) -> str:
         """Return an unambiguous developer-facing representation of this dashboard."""
