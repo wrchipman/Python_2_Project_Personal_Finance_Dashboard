@@ -4,3 +4,6 @@ __pycache__/
 data/*.json
 data/*.csv
 logs/
+scripts/*.py
+!scripts/profile_before.txt
+!scripts/profile_after.txt
