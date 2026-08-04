@@ -1,11 +1,8 @@
 """Dashboard controller class for the Personal Finance Dashboard.
 
-Adds reporting helper methods using comprehensions/generator
-expressions per the tool-selection decision cascade, plus
-iter_monthly_summaries(), a generator function producing one summary
-dict per calendar month. Income/expense classification is derived
-from Category lookups rather than amount sign, since Transaction
-amounts have been positive-only by validated design since Lesson 10.
+load()/save() now read/write real CSV and JSON files via the rewritten
+dashboard/persistence.py, replacing the pipe-delimited text scaffold
+from Lessons 15-16.
 """
 
 from datetime import datetime
@@ -27,9 +24,9 @@ from dashboard.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-ACCOUNTS_FILE = "data/accounts.txt"
-CATEGORIES_FILE = "data/categories.txt"
-TRANSACTIONS_FILE = "data/transactions.txt"
+ACCOUNTS_FILE = "data/accounts.json"
+CATEGORIES_FILE = "data/categories.json"
+TRANSACTIONS_FILE = "data/transactions.csv"
 
 
 class Dashboard:
@@ -69,7 +66,7 @@ class Dashboard:
         self._categories.append(category)
 
     def load(self) -> None:
-        """Load all three collections from their pipe-delimited text files.
+        """Load all three collections from their JSON/CSV files.
 
         Raises:
             FileLoadError: If any file exists but cannot be read or
@@ -80,7 +77,7 @@ class Dashboard:
         self._transactions = load_transactions(TRANSACTIONS_FILE)
 
     def save(self) -> None:
-        """Save all three collections to their pipe-delimited text files.
+        """Save all three collections to their JSON/CSV files.
 
         Raises:
             FileSaveError: If any file cannot be written.
