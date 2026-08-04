@@ -1,12 +1,14 @@
 """Account domain class for the Personal Finance Dashboard.
 
-Now fully encapsulated with protected attributes and validated
-properties. Becomes the base for CreditAccount/SavingsAccount
-subclasses in Lesson 12, then BaseAccount(ABC) in Lesson 13.
+Account now inherits from BaseAccount(ABC), which formally establishes
+the interface CreditAccount and SavingsAccount must also satisfy
+(automatically, since they inherit from Account).
 """
 
+from dashboard.base_account import BaseAccount
 
-class Account:
+
+class Account(BaseAccount):
     """Represents a single financial account (checking, savings, or credit).
 
     Class Attributes:
@@ -143,12 +145,15 @@ class Account:
         """Serialize this account to a plain dictionary.
 
         Returns:
-            A dictionary with keys "name", "account_type", "balance".
+            A dictionary with keys "name", "account_type", "balance",
+            and "class" (the actual runtime class name, so subclasses
+            get the correct value automatically via super().to_dict()).
         """
         return {
             "name": self.name,
             "account_type": self.account_type,
             "balance": self.balance,
+            "class": type(self).__name__,
         }
 
     @classmethod

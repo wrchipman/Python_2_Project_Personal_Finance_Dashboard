@@ -2,6 +2,7 @@
 
 A SavingsAccount is an Account that accrues interest at a fixed rate
 and can apply that interest to its own balance on demand.
+SavingsAccount inherits BaseAccount conformance through Account.
 """
 
 from dashboard.account import Account
@@ -53,12 +54,12 @@ class SavingsAccount(Account):
         """Serialize this savings account to a plain dictionary.
 
         Returns:
-            A dictionary including all Account fields plus
-            "interest_rate" and "class".
+            A dictionary including all Account fields (with "class"
+            correctly set to "SavingsAccount" by the base
+            implementation) plus "interest_rate".
         """
         data = super().to_dict()
         data["interest_rate"] = self.interest_rate
-        data["class"] = "SavingsAccount"
         return data
 
     @classmethod

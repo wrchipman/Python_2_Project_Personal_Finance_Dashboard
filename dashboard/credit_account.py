@@ -3,6 +3,7 @@
 A CreditAccount is an Account whose balance may go negative up to a
 configured credit limit, and whose withdraw() rule is therefore a
 full override rather than an extension of the base Account rule.
+CreditAccount inherits BaseAccount conformance through Account.
 """
 
 from dashboard.account import Account
@@ -68,12 +69,12 @@ class CreditAccount(Account):
         """Serialize this credit account to a plain dictionary.
 
         Returns:
-            A dictionary including all Account fields plus
-            "credit_limit" and "class".
+            A dictionary including all Account fields (with "class"
+            correctly set to "CreditAccount" by the base
+            implementation) plus "credit_limit".
         """
         data = super().to_dict()
         data["credit_limit"] = self.credit_limit
-        data["class"] = "CreditAccount"
         return data
 
     @classmethod
