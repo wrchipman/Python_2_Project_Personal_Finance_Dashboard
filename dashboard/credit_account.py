@@ -1,12 +1,11 @@
 """CreditAccount domain class for the Personal Finance Dashboard.
 
-A CreditAccount is an Account whose balance may go negative up to a
-configured credit limit, and whose withdraw() rule is therefore a
-full override rather than an extension of the base Account rule.
-CreditAccount inherits BaseAccount conformance through Account.
+withdraw() now raises ValidationError/AccountError instead of
+returning False, matching the Account update in this lesson.
 """
 
 from dashboard.account import Account
+from dashboard.exceptions import ValidationError, AccountError
 
 
 class CreditAccount(Account):
@@ -55,13 +54,19 @@ class CreditAccount(Account):
             amount: The amount to charge. Must be positive.
 
         Returns:
-            True if the charge succeeded, False if amount was invalid
-            or would push the balance below -credit_limit.
+            True if the charge succeeded.
+
+        Raises:
+            ValidationError: If amount is not a positive number.
+            AccountError: If the charge would push the balance below
+                -credit_limit.
         """
         if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
-            return False
+            raise ValidationError(f"charge amount must be a positive number, got {amount!r}")
         if self.balance - amount < -self.credit_limit:
-            return False
+            raise AccountError(
+                f"charge of {amount} would exceed credit limit of {self.credit_limit}"
+            )
         self.balance = self.balance - amount
         return True
 

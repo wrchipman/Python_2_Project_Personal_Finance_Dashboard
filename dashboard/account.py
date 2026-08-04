@@ -1,11 +1,13 @@
 """Account domain class for the Personal Finance Dashboard.
 
-Account now has a complete dunder interface supporting equality,
-hashing, ordering, and arithmetic operations, in addition to the
-BaseAccount-conforming instance/class/static methods.
+deposit() and withdraw() now raise ValidationError/AccountError on
+failure instead of returning False, matching the exception hierarchy
+finalized in Lesson 7. This supersedes the return-bool behavior from
+Lessons 9-12.
 """
 
 from dashboard.base_account import BaseAccount
+from dashboard.exceptions import ValidationError, AccountError
 
 
 class Account(BaseAccount):
@@ -93,11 +95,13 @@ class Account(BaseAccount):
             amount: The amount to deposit. Must be positive.
 
         Returns:
-            True if the deposit succeeded, False if amount was not
-            a positive number.
+            True if the deposit succeeded.
+
+        Raises:
+            ValidationError: If amount is not a positive number.
         """
         if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
-            return False
+            raise ValidationError(f"deposit amount must be a positive number, got {amount!r}")
         self.balance = self.balance + amount
         return True
 
@@ -109,13 +113,18 @@ class Account(BaseAccount):
                 greater than the current balance.
 
         Returns:
-            True if the withdrawal succeeded, False if amount was
-            invalid or exceeded the current balance.
+            True if the withdrawal succeeded.
+
+        Raises:
+            ValidationError: If amount is not a positive number.
+            AccountError: If amount exceeds the current balance.
         """
         if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
-            return False
+            raise ValidationError(f"withdraw amount must be a positive number, got {amount!r}")
         if amount > self.balance:
-            return False
+            raise AccountError(
+                f"insufficient funds: balance is {self.balance}, cannot withdraw {amount}"
+            )
         self.balance = self.balance - amount
         return True
 
@@ -302,10 +311,10 @@ class Account(BaseAccount):
             self, with balance updated.
 
         Raises:
-            ValueError: If amount is not a positive number.
+            ValidationError: If amount is not a positive number.
         """
         if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
-            raise ValueError(f"amount must be a positive number, got {amount!r}")
+            raise ValidationError(f"amount must be a positive number, got {amount!r}")
         self.balance = self.balance + amount
         return self
 
@@ -316,9 +325,13 @@ class Account(BaseAccount):
             amount: The amount to withdraw from the balance.
 
         Returns:
-            self, with balance updated if the withdrawal succeeded.
-            If withdraw() returns False (invalid amount or
-            insufficient funds), self is returned unchanged.
+            self, with balance updated on success.
+
+        Raises:
+            ValidationError: If amount is not a positive number
+                (propagated from withdraw()).
+            AccountError: If amount exceeds the current balance
+                (propagated from withdraw()).
         """
         self.withdraw(amount)
         return self
