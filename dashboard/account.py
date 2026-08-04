@@ -1,8 +1,8 @@
 """Account domain class for the Personal Finance Dashboard.
 
-Account now inherits from BaseAccount(ABC), which formally establishes
-the interface CreditAccount and SavingsAccount must also satisfy
-(automatically, since they inherit from Account).
+Account now has a complete dunder interface supporting equality,
+hashing, ordering, and arithmetic operations, in addition to the
+BaseAccount-conforming instance/class/static methods.
 """
 
 from dashboard.base_account import BaseAccount
@@ -221,8 +221,104 @@ class Account(BaseAccount):
 
     def __str__(self) -> str:
         """Return a human-readable string representation of this account."""
-        return f"{self.name} ({self.account_type}): {Account.format_balance(self.balance)}"
+        return f"{self.name} ({self.account_type}) | Balance: {Account.format_balance(self.balance)}"
 
     def __repr__(self) -> str:
         """Return an unambiguous developer-facing representation of this account."""
-        return f"Account(name={self.name!r}, account_type={self.account_type!r}, balance={self.balance!r})"
+        return (
+            f"Account(name={self.name!r}, account_type={self.account_type!r}, "
+            f"balance={self.balance!r})"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        """Compare two accounts for equality by name and account_type.
+
+        Args:
+            other: The object to compare against.
+
+        Returns:
+            True if other is an Account with the same name and
+            account_type. Returns NotImplemented if other is not an
+            Account, letting Python fall back appropriately.
+        """
+        if not isinstance(other, Account):
+            return NotImplemented
+        return self.name == other.name and self.account_type == other.account_type
+
+    def __hash__(self) -> int:
+        """Return a hash consistent with __eq__ (based on name and account_type)."""
+        return hash((self.name, self.account_type))
+
+    def __lt__(self, other: object) -> bool:
+        """Compare two accounts by balance, for use with sorted().
+
+        Args:
+            other: The object to compare against.
+
+        Returns:
+            True if this account's balance is less than other's.
+            Returns NotImplemented if other is not an Account.
+        """
+        if not isinstance(other, Account):
+            return NotImplemented
+        return self.balance < other.balance
+
+    def __add__(self, other: object) -> float:
+        """Combine the balances of two accounts.
+
+        Args:
+            other: The other Account to combine with.
+
+        Returns:
+            The sum of both accounts' balances as a float. Returns
+            NotImplemented if other is not an Account.
+        """
+        if not isinstance(other, Account):
+            return NotImplemented
+        return self.balance + other.balance
+
+    def __radd__(self, other: object) -> float:
+        """Support sum() by handling the initial 0 + account case.
+
+        Args:
+            other: The left-hand operand, expected to be 0 (as
+                supplied by sum()'s default start value).
+
+        Returns:
+            This account's balance if other == 0. Returns
+            NotImplemented otherwise.
+        """
+        if other == 0:
+            return self.balance
+        return NotImplemented
+
+    def __iadd__(self, amount: float) -> "Account":
+        """Increase the balance in place using += .
+
+        Args:
+            amount: The amount to add to the balance.
+
+        Returns:
+            self, with balance updated.
+
+        Raises:
+            ValueError: If amount is not a positive number.
+        """
+        if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0:
+            raise ValueError(f"amount must be a positive number, got {amount!r}")
+        self.balance = self.balance + amount
+        return self
+
+    def __isub__(self, amount: float) -> "Account":
+        """Decrease the balance in place using -= , via withdraw().
+
+        Args:
+            amount: The amount to withdraw from the balance.
+
+        Returns:
+            self, with balance updated if the withdrawal succeeded.
+            If withdraw() returns False (invalid amount or
+            insufficient funds), self is returned unchanged.
+        """
+        self.withdraw(amount)
+        return self

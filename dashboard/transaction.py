@@ -1,14 +1,15 @@
 """Transaction domain class for the Personal Finance Dashboard.
 
-Now fully encapsulated with protected, read-only attributes. The
-account_name field links each Transaction back to the Account it
-belongs to and is required by every later lesson that touches
-Transaction (dunders in L14, persistence in L18, validation in L19).
+Transaction now has a complete dunder interface supporting equality,
+hashing, and date-based ordering via functools.total_ordering, in
+addition to its read-only properties and serialization contract.
 """
 
 from datetime import datetime
+from functools import total_ordering
 
 
+@total_ordering
 class Transaction:
     """Represents a single financial transaction.
 
@@ -169,10 +170,10 @@ class Transaction:
         return f"${amount:,.2f}"
 
     def __str__(self) -> str:
-        """Return a human-readable, column-aligned string representation."""
+        """Return a human-readable string: date | category | $amount | (account)."""
         return (
-            f"{self.date} | {self.category:<15} | "
-            f"{Transaction.format_amount(self.amount):>12} | ({self.account_name})"
+            f"{self.date} | {self.category} | "
+            f"{Transaction.format_amount(self.amount)} | ({self.account_name})"
         )
 
     def __repr__(self) -> str:
@@ -182,3 +183,41 @@ class Transaction:
             f"category={self.category!r}, account_name={self.account_name!r}, "
             f"description={self.description!r})"
         )
+
+    def __eq__(self, other: object) -> bool:
+        """Compare two transactions for equality by amount, date, category, account.
+
+        Args:
+            other: The object to compare against.
+
+        Returns:
+            True if other is a Transaction with the same amount, date,
+            category, and account_name. Returns NotImplemented if
+            other is not a Transaction.
+        """
+        if not isinstance(other, Transaction):
+            return NotImplemented
+        return (
+            self.amount == other.amount
+            and self.date == other.date
+            and self.category == other.category
+            and self.account_name == other.account_name
+        )
+
+    def __hash__(self) -> int:
+        """Return a hash consistent with __eq__ (based on amount, date, category, account_name)."""
+        return hash((self.amount, self.date, self.category, self.account_name))
+
+    def __lt__(self, other: object) -> bool:
+        """Compare two transactions by date, for use with sorted()/total_ordering.
+
+        Args:
+            other: The object to compare against.
+
+        Returns:
+            True if this transaction's date is earlier than other's.
+            Returns NotImplemented if other is not a Transaction.
+        """
+        if not isinstance(other, Transaction):
+            return NotImplemented
+        return self.date < other.date
